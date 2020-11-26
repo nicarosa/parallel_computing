@@ -185,7 +185,6 @@ int main(int argc, char* argv[]) {
     // Compute and print the performance
     float secPerMatrixMul = msecTotal / (ITERATIONS * 1000.0f);
     double flopsPerMatrixMul = 2.0 * (double)width_output * (double)height_output * channels_output;
-    double gigaFlops = (flopsPerMatrixMul * 1.0e-9f) / (secPerMatrixMul / 1000.0f);
     printf(
         "Time= %.8f s, WorkgroupSize= %u threads/block, Blocks= %u\n",
         secPerMatrixMul,
