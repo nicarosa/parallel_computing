@@ -56,9 +56,9 @@ __global__ void bilinear_scaling(
 
 int main(int argc, char* argv[]) 
 {
-    //parameters 1- source, 2- Destination , 3-threads, 4- algorithm-kind
+    //parameters 1- source, 2- Destination , 3-threads
 	
-    if (argc != 5) 
+    if (argc != 4) 
     {
         printf("Argumentos Incompletos.\n");
         exit(EXIT_FAILURE);
@@ -67,7 +67,6 @@ int main(int argc, char* argv[])
     const string source_image_path = argv[1];
     const string result_image_path = argv[2];
     const int threads = atoi(argv[3]);
-    const string algorithm = argv[4];
 	
     //Cuda event para llevar los tiempos
     cudaEvent_t start, end;
@@ -108,7 +107,7 @@ int main(int argc, char* argv[])
     const dim3 threadsPerBlock(threads, threads);
 	
     // Calcula el tamaño de numBlocks para cubrir la imagen entera
-    const dim3 numBlocks(width_output / threadsPerBlock.x, height_output / threadsPerBlock.y);
+    const dim3 numBlocks(output_image.cols / threadsPerBlock.x, output_image.rows / threadsPerBlock.y);
 	
     //Corre el Kernel varias veces para medir un tiempo promedio.
     for(int i = 0; i < ITERATIONS; i++)
