@@ -13,47 +13,6 @@ using namespace std;
 #define RESULT_HEIGHT 480
 #define ITERATIONS 20
 
-static inline void _safe_cuda_call(cudaError err, const char* msg, const char* file_name, const int line_number)
-{
-	if (err != cudaSuccess) 
-	{
-		fprintf(stderr, "%s\n\nFile: %s\n\nLine Number: %d\n\nReason: %s\n", msg, file_name, line_number, cudaGetErrorString(err));
-		exit(EXIT_FAILURE);
-	}
-}
-
-#define SAFE_CALL(call,msg) _safe_cuda_call((call),(msg),__FILE__,__LINE__)
-
-__global__ void nearest_neighbour_scaling(
-    unsigned char *input_image, 
-    unsigned char *output_image,
-    int width_input, 
-    int height_input,
-    int channels_input,
-    int width_output, 
-    int height_output,
-    int channels_output) 
-{
-    const float x_ratio = (width_input + 0.0) / width_output;
-    const float y_ratio = (height_input + 0.0) / height_output;
-    const int xIndex = blockIdx.x * blockDim.x + threadIdx.x;
-    const int yIndex = blockIdx.y * blockDim.y + threadIdx.y;
-	
-    int px = 0, py = 0; 
-    const int input_width_step = width_input * channels_input;
-    const int output_width_step = width_output * channels_output;
-
-    if ((xIndex < width_output) && (yIndex < height_output))
-    {
-        py = ceil(yIndex * y_ratio);
-        px = ceil(xIndex * x_ratio);
-        for (int channel = 0; channel < channels_output; channel++)
-	{
-            *(output_image + (yIndex * output_width_step + xIndex * channels_output + channel)) =  *(input_image + (py * input_width_step + px * channels_input + channel));
-        }
-    }
-}
-
 __global__ void bilinear_scaling(
     unsigned char *input_image, 
     unsigned char *output_image,
@@ -101,7 +60,7 @@ int main(int argc, char* argv[])
 	
     if (argc != 5) 
     {
-        printf("Arguments are not complete. Usage: image_path image_result_path n_threads algorithm.\n");
+        printf("Argumentos Incompletos.\n");
         exit(EXIT_FAILURE);
     }
 	
@@ -119,7 +78,7 @@ int main(int argc, char* argv[])
     Mat input_image = imread(source_image_path);
     if(input_image.empty()) 
     {
-        printf("Error reading image.");
+        printf("Error con imagen.");
         exit(EXIT_FAILURE);
     }
     
@@ -129,26 +88,23 @@ int main(int argc, char* argv[])
 
     unsigned char *d_input, *d_output;
     // Alloc la imagen de input
-    SAFE_CALL(cudaMalloc<unsigned char>(&d_input, input_bytes), "Failed to allocate device input image.");
+    cudaMalloc<unsigned char>(&d_input, input_bytes);
     // Alloc la imagen de output
-    SAFE_CALL(cudaMalloc<unsigned char>(&d_output, output_bytes), "Failed to allocate device output image.");	
+    cudaMalloc<unsigned char>(&d_output, output_bytes);	
     //Copia la imagen de input del host localizada en la memoria del host a la imagen del input del dispositivo en su memoria 
-    SAFE_CALL(cudaMemcpy(d_input, input_image.ptr(), input_bytes, cudaMemcpyHostToDevice), "Failed to copy input image from host to device");
+    cudaMemcpy(d_input, input_image.ptr(), input_bytes, cudaMemcpyHostToDevice);
 	
     // Time Management Start
-    SAFE_CALL(cudaEventCreate(&start), "Failed to create start event.");
+    cudaEventCreate(&start);
     // Time Management End
-    SAFE_CALL(cudaEventCreate(&end), "Failed to create end event");
+    cudaEventCreate(&end);
     // Time Management Record
-    SAFE_CALL(cudaEventRecord(start, NULL), "Failed to start record of start event");
+    cudaEventRecord(start, NULL);
     
-    int width_input = input_image.cols;
-    int height_input = input_image.rows;
     int channels_input = input_image.channels();
-    int width_output = output_image.cols;
-    int height_output = output_image.rows;
     int channels_output = output_image.channels();
 
+    //Define los hilos por bloque
     const dim3 threadsPerBlock(threads, threads);
 	
     // Calcula el tamaño de numBlocks para cubrir la imagen entera
@@ -157,49 +113,38 @@ int main(int argc, char* argv[])
     //Corre el Kernel varias veces para medir un tiempo promedio.
     for(int i = 0; i < ITERATIONS; i++)
     {
-        if(algorithm == "NNS") 
-	{
-            nearest_neighbour_scaling<<<numBlocks, threadsPerBlock>>>(d_input, d_output, width_input, height_input, channels_input, width_output, height_output, channels_output);
-        } 
-	else if(algorithm == "BLN") 
-	{
-            bilinear_scaling<<<numBlocks, threadsPerBlock>>>(d_input, d_output, width_input, height_input, channels_input, width_output, height_output, channels_output);
-        }
-        SAFE_CALL(cudaGetLastError(), "Failed to launch kernel");
+            bilinear_scaling<<<numBlocks, threadsPerBlock>>>(d_input, d_output, input_image.cols, input_image.rows, channels_input, output_image.cols, output_image.rows, channels_output);
     }
 
     // Time management Record Stop
-    SAFE_CALL(cudaEventRecord(end, NULL), "Failed to record end event.");
+    cudaEventRecord(end, NULL);
 
     // Time management Synchronize
-    SAFE_CALL(cudaEventSynchronize(end), "Failed to synchronize on the end event");
+    cudaEventSynchronize(end);
 
     //Calculo de tiempo entre eventos
-    float msecTotal = 0.0f;
-    SAFE_CALL(cudaEventElapsedTime(&msecTotal, start, end), "Failed to get time elapsed between events");
+    float elapsedTime = 0.0f;
+    cudaEventElapsedTime(&elapsedTime, start, end);
 
     // Calcula e imprime tiempo real
-    float secPerMatrixMul = msecTotal / (ITERATIONS * 1000.0f);
+    float time = elapsedTime / (ITERATIONS * 10.0f);
     printf(
-        "Time= %.8f s, Threads/Block= %u, BlocksX= %u, BlocksY= %u, TotalBlocks= %u\n",
-        secPerMatrixMul,
-        threadsPerBlock.x * threadsPerBlock.y,
-	numBlocks.x,
-	numBlocks.y,
-        numBlocks.x * numBlocks.y
+        "Tiempo= %.8f s, Hilos/Block= %u\n",
+        time,
+        threadsPerBlock.x * threadsPerBlock.y
     );
 
     // Copia la imagen del dispositivo al host
-    SAFE_CALL(cudaMemcpy(output_image.ptr(), d_output, output_bytes, cudaMemcpyDeviceToHost), "Failed to copy output image from device to host");
+    cudaMemcpy(output_image.ptr(), d_output, output_bytes, cudaMemcpyDeviceToHost);
 
     // Copia la imagen a un file
     imwrite(result_image_path, output_image);
 
     // Libera la memoria global
-    SAFE_CALL(cudaFree(d_input), "Failed to free device input image");
-    SAFE_CALL(cudaFree(d_output), "Failed to free device output image");
-
+    cudaFree(d_input);
+    cudaFree(d_output);
     printf("Terminado\n");
+	
     return 0;
 }
 
