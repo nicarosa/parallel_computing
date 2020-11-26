@@ -126,7 +126,7 @@ int main(int argc, char* argv[])
     cudaEventElapsedTime(&elapsedTime, start, end);
 
     // Calcula e imprime tiempo real
-    float time = elapsedTime / (ITERATIONS * 10.0f);
+    float time = elapsedTime / (ITERATIONS * 100.0f);
     printf(
         "Tiempo= %.8f s, Hilos/Block= %u\n",
         time,
