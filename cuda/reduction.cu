@@ -181,7 +181,7 @@ int main(int argc, char* argv[])
     // Calcula e imprime tiempo real
     float secPerMatrixMul = msecTotal / (ITERATIONS * 1000.0f);
     printf(
-        "Time= %.8f s, Threads/Block= %u, BlocksX= %u\n, BlocksY= %u\n, TotalBlocks= %u\n",
+        "Time= %.8f s, Threads/Block= %u, BlocksX= %u, BlocksY= %u, TotalBlocks= %u\n",
         secPerMatrixMul,
         threadsPerBlock.x * threadsPerBlock.y,
 	numBlocks.x,
